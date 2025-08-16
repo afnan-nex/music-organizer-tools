@@ -5,7 +5,7 @@ from collections import defaultdict
 from mutagen import File
 
 # ===== CONFIG =====
-MUSIC_DIR = r"D:\test"  # Change to your main music directory
+MUSIC_DIR = r"D:\Music"  # Change to your main music directory
 SUPPORTED_EXTS = {'.mp3', '.ogg', '.mp4', '.m4a', '.wav', '.flac', '.aac', '.wma'}
 # ==================
 
@@ -62,3 +62,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
