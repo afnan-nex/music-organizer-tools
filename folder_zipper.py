@@ -2,7 +2,7 @@ import os
 import zipfile
 
 # ===== CONFIG =====
-TARGET_DIR = r"D:\test"  # Change this to your directory
+TARGET_DIR = r"D:\Music"  # Change this to your directory
 # ==================
 
 def zip_folders_no_compression(directory):
@@ -25,3 +25,4 @@ def zip_folders_no_compression(directory):
 
 if __name__ == "__main__":
     zip_folders_no_compression(TARGET_DIR)
+
