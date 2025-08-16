@@ -105,7 +105,7 @@ python folder_zipper.py
 
 ## **License**
 
-This project is licensed under the MIT License. See the [LICENSE](https://grok.com/chat/LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](https://github.com/afnan-nex/music-organizer-tools/blob/main/LICENSE) file for details.
 
 ## **Contributing**
 
