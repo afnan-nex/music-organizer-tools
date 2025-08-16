@@ -41,7 +41,7 @@ def main():
 
     # 2. Move tracks with same album name (≥ 2 tracks)
     for album, tracks in album_tracks.items():
-        if len(tracks) >= 2:
+        if len(tracks) >= 2:  #you can change the number of minimum tracks with the same album name
             safe_name = safe_folder_name(album)
             album_folder = os.path.join(MUSIC_DIR, safe_name)
 
@@ -62,4 +62,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
