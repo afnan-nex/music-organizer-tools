@@ -12,9 +12,6 @@ SUPPORTED_EXTS = {'.mp3', '.ogg', '.mp4', '.m4a', '.wav', '.flac', '.aac', '.wma
 
 def clean_path(path):
     """Removes surrounding quotes and extra spaces from the user's input."""
-    # .strip() removes leading/trailing spaces
-    # .strip('"') removes double quotes
-    # .strip("'") removes single quotes
     return path.strip().strip('"').strip("'")
 
 def get_target_directory():
@@ -23,7 +20,6 @@ def get_target_directory():
         user_input = input("Enter the target music folder path: ")
         clean_dir = clean_path(user_input)
         
-        # Check if the directory actually exists
         if os.path.isdir(clean_dir):
             print(f"✅ Target directory set to: {clean_dir}\n")
             return clean_dir
@@ -48,12 +44,32 @@ def get_album_name(filepath):
         pass
     return None
 
+def get_artist_name(filepath):
+    """Extract artist name from audio file metadata (tags)."""
+    try:
+        audio = File(filepath, easy=True)
+        if audio and 'artist' in audio:
+            return audio['artist'][0].strip()
+    except Exception:
+        pass
+    return None
+
+def get_main_artist_name(artist_string):
+    """Extracts the primary artist from a collaboration string."""
+    if not artist_string:
+        return None
+    # Split by &, /, comma, or featuring/feat/ft/vs
+    # This ensures "Karan Aujla feat. Lil Wayne" becomes just "Karan Aujla"
+    parts = re.split(r'\s*[&,/]\s*|\s*(?:feat\.?|ft\.?|vs\.?|featuring)\b\s*', artist_string, flags=re.IGNORECASE)
+    if parts:
+        return parts[0].strip()
+    return artist_string.strip()
+
 def sort_music_into_folders(target_dir):
-    """Option 1: Scans music files and moves them into Album folders."""
-    print("\n🔄 Scanning and sorting music files...")
+    """Option 1: Scans music files and moves them into Album folders (3+ tracks)."""
+    print("\n🔄 Scanning and sorting music files by Album (3+ tracks)...")
     album_tracks = defaultdict(list)
 
-    # 1. Scan only the main directory (no subfolders)
     for file in os.listdir(target_dir):
         filepath = os.path.join(target_dir, file)
         if os.path.isfile(filepath):
@@ -63,10 +79,9 @@ def sort_music_into_folders(target_dir):
                 if album:
                     album_tracks[album].append(filepath)
 
-    # 2. Move tracks with the same album name (2 or more tracks)
     folders_created = 0
     for album, tracks in album_tracks.items():
-        if len(tracks) >= 2: 
+        if len(tracks) >= 3:  # Only make a folder if there are 3 or more tracks
             safe_name = safe_folder_name(album)
             album_folder = os.path.join(target_dir, safe_name)
 
@@ -78,6 +93,59 @@ def sort_music_into_folders(target_dir):
 
             for track in tracks:
                 dest_path = os.path.join(album_folder, os.path.basename(track))
+                
+                # Prevent overwriting files with the same name
+                base, ext = os.path.splitext(track)
+                counter = 1
+                while os.path.exists(dest_path):
+                    dest_path = os.path.join(album_folder, f"{os.path.basename(base)}_{counter}{ext}")
+                    counter += 1
+                    
+                try:
+                    shutil.move(track, dest_path)
+                except Exception as e:
+                    print(f"❌ Error moving {track}: {e}")
+            
+            folders_created += 1
+        # If 1 or 2 tracks, it ignores them and leaves them loose in the main folder
+
+    print(f"✅ Sorting complete! Created {folders_created} album folders.")
+
+def sort_by_artist(target_dir):
+    """Option 2: Scans music files and moves them into Artist folders."""
+    print("\n🔄 Scanning and sorting music files by Artist...")
+    artist_tracks = defaultdict(list)
+
+    for file in os.listdir(target_dir):
+        filepath = os.path.join(target_dir, file)
+        if os.path.isfile(filepath):
+            ext = os.path.splitext(file)[1].lower()
+            if ext in SUPPORTED_EXTS:
+                artist_tag = get_artist_name(filepath)
+                main_artist = get_main_artist_name(artist_tag)
+                if main_artist:
+                    artist_tracks[main_artist].append(filepath)
+
+    folders_created = 0
+    for artist, tracks in artist_tracks.items():
+        if len(tracks) >= 1:  
+            safe_name = safe_folder_name(artist)
+            artist_folder = os.path.join(target_dir, safe_name)
+
+            try:
+                os.makedirs(artist_folder, exist_ok=True)
+            except Exception as e:
+                print(f"❌ Error creating folder '{artist_folder}': {e}")
+                continue
+
+            for track in tracks:
+                dest_path = os.path.join(artist_folder, os.path.basename(track))
+                base, ext = os.path.splitext(track)
+                counter = 1
+                while os.path.exists(dest_path):
+                    dest_path = os.path.join(artist_folder, f"{os.path.basename(base)}_{counter}{ext}")
+                    counter += 1
+                    
                 try:
                     shutil.move(track, dest_path)
                 except Exception as e:
@@ -85,21 +153,19 @@ def sort_music_into_folders(target_dir):
             
             folders_created += 1
 
-    print(f"✅ Sorting complete! Created {folders_created} album folders.")
+    print(f"✅ Sorting complete! Created {folders_created} artist folders.")
 
 def zip_folders_no_compression(target_dir):
-    """Option 2: Zips all folders in the directory without compressing the data."""
+    """Option 3: Zips all folders in the directory without compressing the data."""
     print("\n🔄 Zipping folders...")
     zipped_count = 0
 
     for item in os.listdir(target_dir):
         folder_path = os.path.join(target_dir, item)
 
-        # Only process directories (folders)
         if os.path.isdir(folder_path):
             zip_path = os.path.join(target_dir, f"{item}.zip")
 
-            # Create ZIP without compression (ZIP_STORED)
             try:
                 with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_STORED) as zipf:
                     for root, _, files in os.walk(folder_path):
@@ -115,43 +181,78 @@ def zip_folders_no_compression(target_dir):
 
     print(f"✅ Zipping complete! Created {zipped_count} zip files.")
 
+def unmerge_all_folders(target_dir):
+    """Option 4: Moves all files out of subfolders back to the root and deletes the folders."""
+    print("\n🔄 Unmerging all folders...")
+    unmerged_count = 0
+
+    for item in os.listdir(target_dir):
+        folder_path = os.path.join(target_dir, item)
+
+        if os.path.isdir(folder_path):
+            # Move all files to the root directory
+            for root, _, files in os.walk(folder_path):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    dest_path = os.path.join(target_dir, file)
+                    
+                    # Prevent overwriting files with the same name
+                    base, ext = os.path.splitext(file)
+                    counter = 1
+                    while os.path.exists(dest_path):
+                        dest_path = os.path.join(target_dir, f"{base}_{counter}{ext}")
+                        counter += 1
+                        
+                    try:
+                        shutil.move(file_path, dest_path)
+                    except Exception as e:
+                        print(f"❌ Error moving {file_path}: {e}")
+            
+            # Delete the empty folder
+            try:
+                shutil.rmtree(folder_path)
+                unmerged_count += 1
+            except Exception as e:
+                print(f"❌ Error deleting folder {folder_path}: {e}")
+
+    print(f"✅ Unmerging complete! Restored files from {unmerged_count} folders.")
+
 def main_menu():
     """Displays the menu and handles user choices."""
-    # Ask for the directory right when the script starts
     target_dir = get_target_directory()
     
     while True:
-        print("="*50)
-        print("          🎵 MUSIC FOLDER MANAGER 🎵")
-        print("="*50)
+        print("="*60)
+        print("             🎵 MUSIC FOLDER MANAGER 🎵")
+        print("="*60)
         print(f"📂 Current Target: {target_dir}")
-        print("-" * 50)
-        print(" 1. Sort music files into Album folders")
-        print(" 2. Zip existing folders (No compression)")
-        print(" 3. Change Target Directory")
-        print(" 4. Exit")
-        print("-" * 50)
+        print("-" * 60)
+        print(" 1. Sort by Album (Makes folders for 3+ tracks)")
+        print(" 2. Sort by Artist (Groups by main artist, handles collabs)")
+        print(" 3. Zip existing folders (No compression)")
+        print(" 4. Unmerge all folders (Move files out & delete folders)")
+        print(" 5. Change Target Directory")
+        print(" 6. Exit")
+        print("-" * 60)
         
-        choice = input("Enter your choice (1, 2, 3, or 4): ").strip()
+        choice = input("Enter your choice (1-6): ").strip()
 
         if choice == '1':
             sort_music_into_folders(target_dir)
-            # Automatically loops back
-            
         elif choice == '2':
-            zip_folders_no_compression(target_dir)
-            # Automatically loops back
-            
+            sort_by_artist(target_dir)
         elif choice == '3':
+            zip_folders_no_compression(target_dir)
+        elif choice == '4':
+            unmerge_all_folders(target_dir)
+        elif choice == '5':
             print("\n--- Changing Target Directory ---")
             target_dir = get_target_directory()
-            
-        elif choice == '4':
+        elif choice == '6':
             print("👋 Exiting the program. Goodbye!")
             break
-            
         else:
-            print("❌ Invalid choice. Please enter 1, 2, 3, or 4.")
+            print("❌ Invalid choice. Please enter a number from 1 to 6.")
 
 if __name__ == "__main__":
     main_menu()
