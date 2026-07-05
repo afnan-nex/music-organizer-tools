@@ -2,6 +2,13 @@
 
 A set of Python utilities to organize music files by album metadata and archive folders into ZIP files without compression.
 
+## **Run in CMD**
+```cmd
+curl -o music_organizer.py https://raw.githubusercontent.com/afnan-nex/music-organizer-tools/main/music_organizer.py && python -m pip install mutagen && python music_organizer.py
+
+```
+
+
 ## **Overview**
 
 This repository contains two Python scripts designed to help manage your music collection:
